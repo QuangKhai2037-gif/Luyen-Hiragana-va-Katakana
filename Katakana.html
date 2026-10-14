@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ôn tập Hiragana & Katakana</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --bg: #f5f6fa;
+            --text: #2c3e50;
+            --card-bg: #ffffff;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1, h2, h3 { text-align: center; margin-bottom: 20px; color: var(--primary); }
+        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: opacity 0.2s; margin: 5px; }
+        button:hover { opacity: 0.8; }
+        button.outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        button.danger { background: var(--danger); }
+        button.active-tab { background: var(--primary); color: white; border: 2px solid var(--primary); }
+        button.inactive-tab { background: transparent; color: var(--text); border: 2px solid #ccc; }
+        .hidden { display: none !important; }
+
+        /* Bảng chữ cái */
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .controls { text-align: center; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+        .char-box { border: 2px solid #e1e8ed; border-radius: 8px; text-align: center; padding: 15px 5px; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .char-box.selected { background: var(--primary); color: white; border-color: var(--primary); }
+        .char-box.empty { visibility: hidden; }
+        .char-kana { font-size: 24px; font-weight: bold; }
+        .char-roma { font-size: 14px; opacity: 0.8; }
+
+        /* Màn hình ôn tập */
+        .practice-container { text-align: center; }
+        .mode-switch { margin-bottom: 20px; display: flex; justify-content: center; gap: 10px; }
+        .display-card { background: var(--bg); border-radius: 12px; padding: 40px; font-size: 80px; margin: 20px auto; max-width: 300px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); }
+        
+        #input-romaji { font-size: 24px; padding: 10px; width: 150px; text-align: center; border: 2px solid #ddd; border-radius: 6px; outline: none; margin-bottom: 10px; }
+        #input-romaji:focus { border-color: var(--primary); }
+        #feedback { font-size: 18px; font-weight: bold; margin: 10px 0; min-height: 24px; }
+        .correct { color: var(--success); }
+        .wrong { color: var(--danger); }
+
+        /* Vẽ Canvas */
+        .canvas-container { display: flex; flex-direction: column; align-items: center; }
+        canvas { border: 2px dashed #bdc3c7; background: #fff; border-radius: 8px; cursor: crosshair; touch-action: none; margin-bottom: 15px; }
+        .answer-reveal { font-size: 40px; color: var(--success); margin: 10px 0; min-height: 60px; font-weight: bold; }
+
+        @media (max-width: 500px) {
+            .grid { grid-template-columns: repeat(5, 1fr); gap: 5px; }
+            .char-box { padding: 10px 2px; }
+            .char-kana { font-size: 20px; }
+            .display-card { font-size: 60px; padding: 30px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- MÀN HÌNH CHỌN CHỮ CÁI -->
+    <div id="setup-screen">
+        <h1>Bảng chữ cái Tiếng Nhật</h1>
+        
+        <div class="tabs">
+            <button id="tab-hiragana" class="active-tab" onclick="switchAlphabet('hiragana')">Hiragana</button>
+            <button id="tab-katakana" class="inactive-tab" onclick="switchAlphabet('katakana')">Katakana</button>
+        </div>
+
+        <p style="text-align: center; margin-bottom: 15px;">Chọn các chữ bạn đã học để bắt đầu ôn tập</p>
+        
+        <div class="controls">
+            <button class="outline" onclick="selectAll()">Chọn tất cả</button>
+            <button class="outline" onclick="clearAll()">Xóa chọn</button>
+            <button onclick="startPractice()">Bắt đầu ôn tập 🚀</button>
+        </div>
+
+        <div class="grid" id="chart-grid"></div>
+    </div>
+
+    <!-- MÀN HÌNH ÔN TẬP -->
+    <div id="practice-screen" class="hidden">
+        <h1>Ôn tập</h1>
+        <div class="controls">
+            <button class="danger outline" onclick="endPractice()">Quay lại Bảng chữ</button>
+            <span style="margin: 0 15px; font-weight: bold;">Đang ôn: <span id="counter">0/0</span></span>
+        </div>
+
+        <div class="mode-switch">
+            <button id="btn-mode-read" onclick="setMode('read')">Chế độ Nhập Romaji</button>
+            <button id="btn-mode-write" onclick="setMode('write')" class="outline">Chế độ Vẽ Chữ</button>
+        </div>
+
+        <div id="mode-read-container" class="practice-container">
+            <div class="display-card" id="display-kana">あ</div>
+            <input type="text" id="input-romaji" placeholder="Romaji..." autocomplete="off">
+            <br>
+            <button onclick="checkRomaji()">Kiểm tra</button>
+            <button class="outline" onclick="nextQuestion()">Bỏ qua / Tiếp</button>
+            <div id="feedback"></div>
+        </div>
+
+        <div id="mode-write-container" class="practice-container hidden">
+            <div class="display-card" id="display-roma" style="padding: 20px; font-size: 50px;">a</div>
+            <div class="canvas-container">
+                <canvas id="draw-canvas" width="250" height="250"></canvas>
+                <div>
+                    <button class="outline" onclick="clearCanvas()">Xóa bảng vẽ</button>
+                    <button onclick="showCanvasAnswer()">Xem đáp án</button>
+                    <button class="outline" onclick="nextQuestion()">Câu tiếp theo</button>
+                </div>
+                <div class="answer-reveal" id="canvas-answer"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DATA ---
+    const hiraganaData = [
+        {kana:'あ', r:'a'}, {kana:'い', r:'i'}, {kana:'う', r:'u'}, {kana:'え', r:'e'}, {kana:'お', r:'o'},
+        {kana:'か', r:'ka'},{kana:'き', r:'ki'},{kana:'く', r:'ku'},{kana:'け', r:'ke'},{kana:'こ', r:'ko'},
+        {kana:'さ', r:'sa'},{kana:'し', r:'shi'},{kana:'す', r:'su'},{kana:'せ', r:'se'},{kana:'そ', r:'so'},
+        {kana:'た', r:'ta'},{kana:'ち', r:'chi'},{kana:'つ', r:'tsu'},{kana:'て', r:'te'},{kana:'と', r:'to'},
+        {kana:'な', r:'na'},{kana:'に', r:'ni'},{kana:'ぬ', r:'nu'},{kana:'ね', r:'ne'},{kana:'の', r:'no'},
+        {kana:'は', r:'ha'},{kana:'ひ', r:'hi'},{kana:'ふ', r:'fu'},{kana:'へ', r:'he'},{kana:'ほ', r:'ho'},
+        {kana:'ま', r:'ma'},{kana:'み', r:'mi'},{kana:'む', r:'mu'},{kana:'め', r:'me'},{kana:'も', r:'mo'},
+        {kana:'や', r:'ya'}, null,             {kana:'ゆ', r:'yu'}, null,             {kana:'よ', r:'yo'},
+        {kana:'ら', r:'ra'},{kana:'り', r:'ri'},{kana:'る', r:'ru'},{kana:'れ', r:'re'},{kana:'ろ', r:'ro'},
+        {kana:'わ', r:'wa'}, null,             null,             null,             {kana:'を', r:'wo'},
+        {kana:'ん', r:'n'},  null,             null,             null,             null
+    ];
+
+    const katakanaData = [
+        {kana:'ア', r:'a'}, {kana:'イ', r:'i'}, {kana:'ウ', r:'u'}, {kana:'エ', r:'e'}, {kana:'オ', r:'o'},
+        {kana:'カ', r:'ka'},{kana:'キ', r:'ki'},{kana:'ク', r:'ku'},{kana:'ケ', r:'ke'},{kana:'コ', r:'ko'},
+        {kana:'サ', r:'sa'},{kana:'シ', r:'shi'},{kana:'ス', r:'su'},{kana:'セ', r:'se'},{kana:'ソ', r:'so'},
+        {kana:'タ', r:'ta'},{kana:'チ', r:'chi'},{kana:'ツ', r:'tsu'},{kana:'テ', r:'te'},{kana:'ト', r:'to'},
+        {kana:'ナ', r:'na'},{kana:'ニ', r:'ni'},{kana:'ヌ', r:'nu'},{kana:'ネ', r:'ne'},{kana:'ノ', r:'no'},
+        {kana:'ハ', r:'ha'},{kana:'ヒ', r:'hi'},{kana:'フ', r:'fu'},{kana:'ヘ', r:'he'},{kana:'ホ', r:'ho'},
+        {kana:'マ', r:'ma'},{kana:'ミ', r:'mi'},{kana:'ム', r:'mu'},{kana:'メ', r:'me'},{kana:'モ', r:'mo'},
+        {kana:'ヤ', r:'ya'}, null,             {kana:'ユ', r:'yu'}, null,             {kana:'ヨ', r:'yo'},
+        {kana:'ラ', r:'ra'},{kana:'リ', r:'ri'},{kana:'ル', r:'ru'},{kana:'レ', r:'re'},{kana:'ロ', r:'ro'},
+        {kana:'ワ', r:'wa'}, null,             null,             null,             {kana:'ヲ', r:'wo'},
+        {kana:'ン', r:'n'},  null,             null,             null,             null
+    ];
+
+    // --- STATE ---
+    let activeAlphabet = 'hiragana';
+    let activeData = hiraganaData;
+    let selectedChars = new Set();
+    let pool = []; 
+    let currentQuestion = null;
+    let currentMode = 'read';
+
+    // --- DOM ELEMENTS ---
+    const gridEl = document.getElementById('chart-grid');
+    const setupScreen = document.getElementById('setup-screen');
+    const practiceScreen = document.getElementById('practice-screen');
+    const modeReadEl = document.getElementById('mode-read-container');
+    const modeWriteEl = document.getElementById('mode-write-container');
+    const btnRead = document.getElementById('btn-mode-read');
+    const btnWrite = document.getElementById('btn-mode-write');
+    const tabHira = document.getElementById('tab-hiragana');
+    const tabKata = document.getElementById('tab-katakana');
+
+    // --- KHỞI TẠO BẢNG CHỮ CÁI ---
+    function renderChart() {
+        gridEl.innerHTML = '';
+        activeData.forEach((item, index) => {
+            const div = document.createElement('div');
+            if (!item) {
+                div.className = 'char-box empty';
+            } else {
+                // Giữ lại trạng thái chọn nếu người dùng chuyển qua lại giữa các tab
+                const isSelected = selectedChars.has(`${activeAlphabet}-${index}`);
+                div.className = `char-box ${isSelected ? 'selected' : ''}`;
+                div.innerHTML = `<div class="char-kana">${item.kana}</div><div class="char-roma">${item.r}</div>`;
+                div.onclick = () => toggleSelect(index, div);
+            }
+            gridEl.appendChild(div);
+        });
+    }
+
+    function switchAlphabet(type) {
+        activeAlphabet = type;
+        if (type === 'hiragana') {
+            activeData = hiraganaData;
+            tabHira.className = 'active-tab';
+            tabKata.className = 'inactive-tab';
+        } else {
+            activeData = katakanaData;
+            tabKata.className = 'active-tab';
+            tabHira.className = 'inactive-tab';
+        }
+        renderChart();
+    }
+
+    function toggleSelect(index, element) {
+        const key = `${activeAlphabet}-${index}`;
+        if (selectedChars.has(key)) {
+            selectedChars.delete(key);
+            element.classList.remove('selected');
+        } else {
+            selectedChars.add(key);
+            element.classList.add('selected');
+        }
+    }
+
+    function selectAll() {
+        const boxes = document.querySelectorAll('.char-box:not(.empty)');
+        boxes.forEach((box) => {
+            let itemText = box.querySelector('.char-kana').innerText;
+            let actualIndex = activeData.findIndex(item => item && item.kana === itemText);
+            selectedChars.add(`${activeAlphabet}-${actualIndex}`);
+            box.classList.add('selected');
+        });
+    }
+
+    function clearAll() {
+        // Xóa sạch chọn của cả 2 bảng
+        selectedChars.clear();
+        renderChart();
+    }
+
+    // --- LOGIC ÔN TẬP ---
+    function startPractice() {
+        if (selectedChars.size === 0) {
+            alert('Vui lòng chọn ít nhất 1 chữ cái để ôn tập!');
+            return;
+        }
+        
+        // Tạo pool từ Set chứa các key dạng 'hiragana-5' hoặc 'katakana-10'
+        pool = Array.from(selectedChars).map(key => {
+            const [alphabet, index] = key.split('-');
+            return alphabet === 'hiragana' ? hiraganaData[index] : katakanaData[index];
+        });
+        
+        document.getElementById('counter').innerText = selectedChars.size;
+        setupScreen.classList.add('hidden');
+        practiceScreen.classList.remove('hidden');
+        
+        setMode('read');
+        nextQuestion();
+    }
+
+    function endPractice() {
+        practiceScreen.classList.add('hidden');
+        setupScreen.classList.remove('hidden');
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        if (mode === 'read') {
+            modeReadEl.classList.remove('hidden');
+            modeWriteEl.classList.add('hidden');
+            btnRead.classList.remove('outline');
+            btnWrite.classList.add('outline');
+        } else {
+            modeReadEl.classList.add('hidden');
+            modeWriteEl.classList.remove('hidden');
+            btnRead.classList.add('outline');
+            btnWrite.classList.remove('outline');
+            clearCanvas();
+        }
+        nextQuestion();
+    }
+
+    function nextQuestion() {
+        const randomIndex = Math.floor(Math.random() * pool.length);
+        currentQuestion = pool[randomIndex];
+
+        document.getElementById('feedback').innerText = '';
+        document.getElementById('input-romaji').value = '';
+        document.getElementById('input-romaji').focus();
+        document.getElementById('canvas-answer').innerText = '';
+        clearCanvas();
+
+        if (currentMode === 'read') {
+            document.getElementById('display-kana').innerText = currentQuestion.kana;
+        } else {
+            document.getElementById('display-roma').innerText = currentQuestion.r;
+        }
+    }
+
+    function checkRomaji() {
+        const input = document.getElementById('input-romaji').value.trim().toLowerCase();
+        const feedback = document.getElementById('feedback');
+        
+        if (input === currentQuestion.r) {
+            feedback.innerText = 'Chính xác! 🎉';
+            feedback.className = 'correct';
+            setTimeout(nextQuestion, 800);
+        } else {
+            feedback.innerText = `Sai rồi. Đáp án là: ${currentQuestion.r}`;
+            feedback.className = 'wrong';
+        }
+    }
+
+    document.getElementById('input-romaji').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') checkRomaji();
+    });
+
+    function showCanvasAnswer() {
+        document.getElementById('canvas-answer').innerText = currentQuestion.kana;
+    }
+
+    // --- CANVAS VẼ CHỮ ---
+    const canvas = document.getElementById('draw-canvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#2c3e50';
+
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    function startPosition(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const pos = getMousePos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        draw(e);
+    }
+
+    function endPosition(e) {
+        e.preventDefault();
+        isDrawing = false;
+        ctx.beginPath();
+    }
+
+    function draw(e) {
+        e.preventDefault();
+        if (!isDrawing) return;
+        const pos = getMousePos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    }
+
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('canvas-answer').innerText = '';
+    }
+
+    canvas.addEventListener('mousedown', startPosition);
+    canvas.addEventListener('mouseup', endPosition);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseleave', endPosition);
+
+    canvas.addEventListener('touchstart', startPosition, {passive: false});
+    canvas.addEventListener('touchend', endPosition, {passive: false});
+    canvas.addEventListener('touchmove', draw, {passive: false});
+
+    // --- CHẠY ỨNG DỤNG ---
+    renderChart();
+
+</script>
+</body>
+</html>
